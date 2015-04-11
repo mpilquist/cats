@@ -17,6 +17,9 @@ object arbitrary {
   implicit def xorArbitrary[A, B](implicit A: Arbitrary[A], B: Arbitrary[B]): Arbitrary[A Xor B] =
     Arbitrary(Gen.oneOf(A.arbitrary.map(Xor.left), B.arbitrary.map(Xor.right)))
 
+  implicit def xorTArbitrary[F[_], A, B](implicit F: ArbitraryK[F], A: Arbitrary[A], B: Arbitrary[B]): Arbitrary[XorT[F, A, B]] =
+    Arbitrary(F.synthesize[A Xor B].arbitrary.map(XorT(_)))
+
   implicit def iorArbitrary[A, B](implicit A: Arbitrary[A], B: Arbitrary[B]): Arbitrary[A Ior B] =
     Arbitrary(Gen.oneOf(A.arbitrary.map(Ior.left), B.arbitrary.map(Ior.right), for { a <- A.arbitrary; b <- B.arbitrary } yield Ior.both(a, b)))
 

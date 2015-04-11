@@ -29,8 +29,8 @@ case class XorT[F[_], A, B](value: F[A Xor B]) {
 
   def bimap[C, D](fa: A => C, fb: B => D)(implicit F: Functor[F]): XorT[F, C, D] = XorT(F.map(value)(_.bimap(fa, fb)))
 
-  def apply[D](ff: XorT[F, A, B => D])(implicit F: Apply[F]): XorT[F, A, D] =
-    XorT[F, A, D](F.apply(this.value)(F.map(ff.value)(xbd => xb => Apply[A Xor ?].apply(xb)(xbd))))
+  def applyAlt[D](ff: XorT[F, A, B => D])(implicit F: Apply[F]): XorT[F, A, D] =
+    XorT[F, A, D](F.map2(this.value, ff.value)((xb, xbd) => Apply[A Xor ?].apply(xb)(xbd)))
 
   def flatMap[AA >: A, D](f: B => XorT[F, AA, D])(implicit F: Monad[F]): XorT[F, AA, D] =
     XorT(F.flatMap(value) {
@@ -97,7 +97,7 @@ trait XorTFunctions {
 }
 
 abstract class XorTInstances extends XorTInstances1 {
-  implicit def xorTMonadCombine[F[_], L](implicit F: MonadFilter[F], L: Monoid[L]): MonadCombine[XorT[F, L, ?]] = {
+  implicit def xorTMonadCombine[F[_], L](implicit F: Monad[F], L: Monoid[L]): MonadCombine[XorT[F, L, ?]] = {
     implicit val F0 = F
     implicit val L0 = L
     new XorTMonadCombine[F, L] { implicit val F = F0; implicit val L = L0 }
@@ -114,7 +114,7 @@ abstract class XorTInstances extends XorTInstances1 {
 }
 
 private[data] abstract class XorTInstances1 extends XorTInstances2 {
-  implicit def xorTMonadFilter[F[_], L](implicit F: MonadFilter[F], L: Monoid[L]): MonadFilter[XorT[F, L, ?]] = {
+  implicit def xorTMonadFilter[F[_], L](implicit F: Monad[F], L: Monoid[L]): MonadFilter[XorT[F, L, ?]] = {
     implicit val F0 = F
     implicit val L0 = L
     new XorTMonadFilter[F, L] { implicit val F = F0; implicit val L = L0 }
@@ -134,48 +134,21 @@ private[data] abstract class XorTInstances2 extends XorTInstances3 {
   }
 }
 
-private[data] abstract class XorTInstances3 extends XorTInstances4 {
-  implicit def xorTApplicative[F[_], L](implicit F: Applicative[F]): Applicative[XorT[F, L, ?]] = {
-    implicit val F0 = F
-    new XorTApplicative[F, L] { implicit val F = F0 }
-  }
-}
-
-private[data] abstract class XorTInstances4 extends XorTInstances5 {
-  implicit def xorTApply[F[_], L](implicit F: Apply[F]): Apply[XorT[F, L, ?]] = {
-    implicit val F0 = F
-    new XorTApply[F, L] { implicit val F = F0 }
-  }
-}
-
-private[data] abstract class XorTInstances5 {
+private[data] abstract class XorTInstances3 {
   implicit def xorTFunctor[F[_], L](implicit F: Functor[F]): Functor[XorT[F, L, ?]] = {
     implicit val F0 = F
     new XorTFunctor[F, L] { implicit val F = F0 }
   }
 }
 
-
-
-
-
 private[data] trait XorTFunctor[F[_], L] extends Functor[XorT[F, L, ?]] {
   implicit val F: Functor[F]
   override def map[A, B](fa: XorT[F, L, A])(f: A => B): XorT[F, L, B] = fa map f
 }
 
-private[data] trait XorTApply[F[_], L] extends Apply[XorT[F, L, ?]] with XorTFunctor[F, L] {
-  implicit val F: Apply[F]
-  override def apply[A, B](fa: XorT[F, L, A])(ff: XorT[F, L, A => B]): XorT[F, L, B] = fa apply ff
-}
-
-private[data] trait XorTApplicative[F[_], L] extends Applicative[XorT[F, L, ?]] with XorTApply[F, L] {
-  implicit val F: Applicative[F]
-  def pure[A](a: A): XorT[F, L, A] = XorT.pure[F, L, A](a)
-}
-
-private[data] trait XorTMonad[F[_], L] extends Monad[XorT[F, L, ?]] with XorTApplicative[F, L] {
+private[data] trait XorTMonad[F[_], L] extends Monad[XorT[F, L, ?]] with XorTFunctor[F, L] {
   implicit val F: Monad[F]
+  def pure[A](a: A): XorT[F, L, A] = XorT.pure[F, L, A](a)
   def flatMap[A, B](fa: XorT[F, L, A])(f: A => XorT[F, L, B]): XorT[F, L, B] = fa flatMap f
 }
 
@@ -193,13 +166,13 @@ private[data] trait XorTSemigroupK[F[_], L] extends SemigroupK[XorT[F, L, ?]] {
 }
 
 private[data] trait XorTMonadFilter[F[_], L] extends MonadFilter[XorT[F, L, ?]] with XorTMonad[F, L] {
-  implicit val F: MonadFilter[F]
+  implicit val F: Monad[F]
   implicit val L: Monoid[L]
   def empty[A]: XorT[F, L, A] = XorT(F.pure(Xor.left(L.empty)))
 }
 
 private[data] trait XorTMonadCombine[F[_], L] extends MonadCombine[XorT[F, L, ?]] with XorTMonadFilter[F, L] with XorTSemigroupK[F, L] {
-  implicit val F: MonadFilter[F]
+  implicit val F: Monad[F]
   implicit val L: Monoid[L]
 }
 
