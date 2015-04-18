@@ -68,19 +68,8 @@ case class XorT[F[_], A, B](value: F[A Xor B]) {
 
   def merge[AA >: A](implicit ev: B <:< AA, F: Functor[F]): F[AA] = F.map(value)(_.fold(identity, ev.apply))
 
-  final def combine(that: XorT[F, A, B])(implicit A: Semigroup[A], B: Semigroup[B]): A Xor B = ???
-    /* TODO
-    this match {
-    case Xor.Left(a1) => that match {
-      case Xor.Left(a2) => Xor.Left(AA.combine(a1, a2))
-      case Xor.Right(b2) => Xor.Left(a1)
-    }
-    case Xor.Right(b1) => that match {
-      case Xor.Left(a2) => Xor.Left(a2)
-      case Xor.Right(b2) => Xor.Right(BB.combine(b1, b2))
-    }
-  }
-  */
+  def combine(that: XorT[F, A, B])(implicit F: Apply[F], A: Semigroup[A], B: Semigroup[B]): XorT[F, A, B] =
+    XorT(F.map2(this.value, that.value)(_ combine _))
 
   def show(implicit show: Show[F[A Xor B]]): String = show.show(value)
 }
