@@ -6,16 +6,26 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Prop
 import Prop._
 
+class ApplyTestImplicits[F[_], A, B, C](implicit
+  val arbFAtoB: Arbitrary[F[A => B]],
+  val arbFBtoC: Arbitrary[F[B => C]],
+  val invariant: InvariantTestImplicits[F, A, B, C]
+)
+
+object ApplyTestImplicits {
+  implicit def materialize[F[_], A, B, C](implicit
+    arbFAtoB: Arbitrary[F[A => B]],
+    arbFBtoC: Arbitrary[F[B => C]],
+    invariant: InvariantTestImplicits[F, A, B, C]
+  ): ApplyTestImplicits[F, A, B, C] =
+    new ApplyTestImplicits()(arbFAtoB, arbFBtoC, invariant)
+}
 trait ApplyTests[F[_]] extends FunctorTests[F] {
   def laws: ApplyLaws[F]
 
-  def apply[A: Arbitrary, B: Arbitrary, C: Arbitrary](implicit
-    ArbFA: Arbitrary[F[A]],
-    ArbFAtoB: Arbitrary[F[A => B]],
-    ArbFBtoC: Arbitrary[F[B => C]],
-    EqFA: Eq[F[A]],
-    EqFC: Eq[F[C]]
-  ): RuleSet = {
+  def apply[A, B, C](implicit implicits: ApplyTestImplicits[F, A, B, C]): RuleSet = {
+    import implicits._
+    import implicits.invariant._
     new DefaultRuleSet(
       name = "apply",
       parent = Some(functor[A, B, C]),

@@ -8,15 +8,32 @@ import org.scalacheck.Prop
 import Prop._
 import org.typelevel.discipline.Laws
 
+ class InvariantTestImplicits[F[_], A, B, C](implicit
+  val arbA: Arbitrary[A],
+  val arbB: Arbitrary[B],
+  val arbC: Arbitrary[C],
+  val arbFA: Arbitrary[F[A]],
+  val eqFA: Eq[F[A]],
+  val eqFC: Eq[F[C]]
+)
+
+object InvariantTestImplicits {
+  implicit def materialize[F[_], A, B, C](implicit
+    arbA: Arbitrary[A],
+    arbB: Arbitrary[B],
+    arbC: Arbitrary[C],
+    arbFA: Arbitrary[F[A]],
+    eqFA: Eq[F[A]],
+    eqFC: Eq[F[C]]
+  ): InvariantTestImplicits[F, A, B, C] =
+    new InvariantTestImplicits()(arbA, arbB, arbC, arbFA, eqFA, eqFC)
+}
+
 trait InvariantTests[F[_]] extends Laws {
   def laws: InvariantLaws[F]
 
-  def invariant[A: Arbitrary, B: Arbitrary, C: Arbitrary](implicit
-    ArbFA: Arbitrary[F[A]],
-    EqFA: Eq[F[A]],
-    EqFC: Eq[F[C]]
-  ): RuleSet = {
-
+  def invariant[A, B, C](implicit implicits: InvariantTestImplicits[F, A, B, C]): RuleSet = {
+    import implicits._
     new DefaultRuleSet(
       name = "invariant",
       parent = None,
